@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+import websockets
 
 
 # Get the authentication token
@@ -91,10 +92,25 @@ async def get_hotkeys(websocket, model_id=None):
             "modelID": model_id
         }
     }
-    await websocket.send(json.dumps(message))
-    result = await websocket.recv()
-    # print(json.dumps(json.loads(result), indent=4))
-    return json.loads(result)["data"]["availableHotkeys"]
+    try:
+        await websocket.send(json.dumps(message))
+        result = await websocket.recv()
+        data = json.loads(result)
+        print(json.dumps(data, indent=4))
+        expressions = []
+        animations = []
+        for item in data['data']["availableHotkeys"]:
+            if item['type'] == "ToggleExpression":
+                expressions.append(item['name'])
+            elif item['type'] == "TriggerAnimation":
+                animations.append(item['name'])
+        return animations, expressions
+    except websockets.ConnectionClosed as e:
+        print("WebSocket connection closed: ", e)
+        return None
+    except Exception as e:
+        print("Error while retrieving hotkeys: ", e)
+        return None
 
 
 # Execute a hotkey
