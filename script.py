@@ -8,7 +8,7 @@ from extensions.vtube_studio import functions as vtube_studio_functions
 
 params = {
     'activate': True,
-    'host': None,
+    'host': "",
     'port': 8001,
     'model': None,
     'model_dict': {},
@@ -23,7 +23,7 @@ websocket = None
 
 async def get_os():
     if 'wsl2' and 'microsoft' in str(platform.uname()).lower():
-        print('Running in WSL')
+        print('Running in WSL, using hostname.local because WSL uses a virtual network')
         host = f'{platform.uname().node}.local'
     else:
         # print('Not running in WSL')
@@ -32,17 +32,18 @@ async def get_os():
 
 
 async def connect():
-    global websocket
+    global websocket, params
 
-    if params['host'] is not None:
-        host = params['host']
-    else:
-        host = await get_os()
+    if not params['activate']:
+        return
+
+    if not params['host']:
+        params.update({'host': await get_os()})
 
     # Connect to VTube Studio
     print('Connecting to VTube Studio...')
     try:
-        websocket = await websockets.connect(f'ws://{host}:{params["port"]}', ping_interval=None)
+        websocket = await websockets.connect(f'ws://{params["host"]}:{params["port"]}', ping_interval=None)
     except asyncio.TimeoutError as err:
         raise asyncio.TimeoutError('Failed to connect to VTube Studio!  Please check the port number and make sure the API is running') from err
     if not websocket:
@@ -66,12 +67,27 @@ async def connect():
         pass
 
 
+async def disconnect(x):
+    global websocket
+
+    if not x:
+        if websocket:
+            print('Disconnecting from VTube Studio...')
+            try:
+                await websocket.close()
+            except Exception as err:
+                print(err)
+                websocket = None
+            print('Disconnected from VTube Studio')
+            websocket = None
+
+
 async def update_menus():
     model_list = await get_models()
 
     hotkey_list = await get_available_hotkeys()
 
-    return model_list, *hotkey_list
+    return *model_list, *hotkey_list
 
 
 # play the hotkey in VTube Studio
@@ -101,7 +117,8 @@ async def get_available_hotkeys(model_id=None):
     return [gr.update(choices=animation_list, value=params['animation'], interactive=True if params['animation'] else False),
             gr.update(choices=expression_list, value=params['expression'],  interactive=True if params['expression'] else False),
             gr.update(interactive=True if params['animation'] else False),
-            gr.update(interactive=True if params['expression'] else False)]
+            gr.update(interactive=True if params['expression'] else False),
+            gr.update(interactive=True if params['animation'] or params['expression'] else False)]
 
 
 async def get_models():
@@ -114,7 +131,7 @@ async def get_models():
         params.update({'model': list(model_dict.keys())[list(model_dict.values()).index(current_model)]})
     else:
         params.update({'model': None})
-    return gr.update(choices=list(model_dict.keys()), value=params['model'])
+    return gr.update(choices=list(model_dict.keys()), value=params['model']), gr.update(interactive=True if params['model'] else False),  gr.update(interactive=True if params['model'] else False)
 
 
 async def load_model(current_model):
@@ -128,18 +145,17 @@ def ui():
     global params
     # Gradio elements
     with gr.Accordion("VTube Studio"):
+        activate = gr.Checkbox(value=params['activate'], label='Activate VTube Studio')
         with gr.Row():
-            activate = gr.Checkbox(value=params['activate'], label='Activate VTube Studio')
+            host_text = gr.Textbox(value=params['host'], label='Host', placeholder='Leave blank for localhost')
             port_number = gr.Number(value=params['port'], label='Port', precision=0)
             connect_button = gr.Button('Connect')
 
         with gr.Row():
-            with gr.Column():
-                model_dropdown = gr.Dropdown(choices=list(params['model_dict'].keys()), value=params['model'], label='VTuber Model')
-            with gr.Column():
-                model_load_button = gr.Button('Load Model')
+            model_dropdown = gr.Dropdown(choices=list(params['model_dict'].keys()), value=params['model'], label='VTuber Model')
+            model_load_button = gr.Button('Load Model', interactive=True if params['model'] else False)
 
-            model_refresh_button = gr.Button('Refresh')
+        model_refresh_button = gr.Button('Refresh',  interactive=True if params['model'] else False)
 
         with gr.Row():
             animations_dropdown = gr.Dropdown(choices=params['animation_list'], value=params['animation'], label='Animation')
@@ -149,17 +165,18 @@ def ui():
             expressions_dropdown = gr.Dropdown(choices=params['expression_list'], value=params['expression'], label='Expression')
             expression_button = gr.Button('Play Expression',  interactive=True if params['expression'] else False)
 
-        refresh_hotkeys_button = gr.Button('Refresh')
+        refresh_hotkeys_button = gr.Button('Refresh', interactive=True if params['animation'] or params['expression'] else False)
 
     # Event functions to update the parameters in the backend
-    activate.change(lambda x: params.update({'activate': x}), activate, None)
+    activate.change(lambda x: params.update({'activate': x}), activate, None).then(fn=disconnect, inputs=activate, outputs=None)
     model_dropdown.change(lambda x: params.update({'model': x}), model_dropdown, None)
     port_number.change(lambda x: params.update({'port': x}), port_number, None)
     animations_dropdown.change(lambda x: params.update({'animation': x}), animations_dropdown, None)
     expressions_dropdown.change(lambda x: params.update({'expression': x}), expressions_dropdown, None)
+    host_text.change(lambda x: params.update({'host': x}), host_text, None)
 
     # Connect to VTube Studio
-    connect_button.click(fn=connect, inputs=None, outputs=None).success(update_menus, outputs=[model_dropdown, animations_dropdown, expressions_dropdown, animation_button, expression_button])
+    connect_button.click(fn=connect, inputs=None, outputs=None).success(update_menus, outputs=[model_dropdown, model_load_button, model_refresh_button, animations_dropdown, expressions_dropdown, animation_button, expression_button, refresh_hotkeys_button])
 
     # Play animation
     animation_button.click(fn=play_hotkey, inputs=animations_dropdown)
@@ -171,7 +188,7 @@ def ui():
     refresh_hotkeys_button.click(fn=get_available_hotkeys, inputs=None, outputs=[animations_dropdown, expressions_dropdown, animation_button, expression_button])
 
     # Refresh models
-    model_refresh_button.click(fn=get_models, inputs=None, outputs=model_dropdown)
+    model_refresh_button.click(fn=get_models, inputs=None, outputs=[model_dropdown,  model_load_button, model_refresh_button])
 
     # Load model
     model_load_button.click(fn=load_model, inputs=model_dropdown, outputs=[animations_dropdown, expressions_dropdown, animation_button, expression_button])
