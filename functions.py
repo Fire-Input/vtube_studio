@@ -9,9 +9,9 @@ async def get_auth_token(websocket):
     try:
         if auth_file.is_file():
             with open(auth_file, "r") as token_file:
-                print(f"Reading authentication token from {auth_file}")
+                # print(f"Reading authentication token from {auth_file}")
                 auth_token = token_file.read().strip()
-            print(f"Found authentication token in {auth_file}")
+            # print(f"Found authentication token in {auth_file}")
             if auth_token is None:
                 raise FileNotFoundError
         else:
@@ -54,12 +54,12 @@ async def authenticate(websocket, auth_token):
             "authenticationToken": auth_token
         }
     }
-    print("Sending authentication request...")
+    # print("Sending authentication request...")
     await websocket.send(json.dumps(message))
     result = await websocket.recv()
     response = json.loads(result)
     if response["messageType"] == "AuthenticationResponse" and response["data"]["authenticated"]:
-        print("Plugin authenticated for the duration of this session")
+        # print("Plugin authenticated for the duration of this session")
         return True
     else:
         print("Authentication failed:", json.dumps(response, indent=4))
@@ -128,7 +128,7 @@ async def execute_hotkey(websocket, animation_hotkey=None, expression_hotkey=Non
 
     # If an expression hotkey is specified, execute it
     if expression_hotkey:
-        print("Executing expression hotkey:", expression_hotkey)
+        # print("Executing expression hotkey:", expression_hotkey)
         message = {
             "apiName": "VTubeStudioPublicAPI",
             "apiVersion": "1.0",
@@ -148,16 +148,16 @@ async def execute_hotkey(websocket, animation_hotkey=None, expression_hotkey=Non
                 return False
             # If the hotkey was successfully executed, set the success flag to true
             else:
-                print("Expression hotkey executed successfully")
+                # print("Expression hotkey executed successfully")
                 success = True
         # If there was no errorID, the hotkey was successfully executed
         except KeyError:
-            print("Expression hotkey executed successfully")
+            # print("Expression hotkey executed successfully")
             success = True
 
     # If an animation hotkey is specified, execute it
     if animation_hotkey:
-        print("Executing animation hotkey:", animation_hotkey)
+        # print("Executing animation hotkey:", animation_hotkey)
         message = {
             "apiName": "VTubeStudioPublicAPI",
             "apiVersion": "1.0",
@@ -177,11 +177,11 @@ async def execute_hotkey(websocket, animation_hotkey=None, expression_hotkey=Non
                 return False
             # If the hotkey was successfully executed, set the success flag to true
             else:
-                print("Animation hotkey executed successfully")
+                # print("Animation hotkey executed successfully")
                 success = True
         # If there was no errorID, the hotkey was successfully executed
         except KeyError:
-            print("Animation hotkey executed successfully")
+            # print("Animation hotkey executed successfully")
             success = True
 
     # Return the success flag
@@ -226,9 +226,9 @@ async def load_model(websocket, model_name):
             return False
         # If the model was successfully loaded, return true
         else:
-            print("Model loaded successfully")
+            # print("Model loaded successfully")
             return True
     # If there was no errorID, the model was successfully loaded
     except KeyError:
-        print("Model loaded successfully")
+        # print("Model loaded successfully")
         return True

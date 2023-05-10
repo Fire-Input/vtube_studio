@@ -26,7 +26,7 @@ async def get_os():
         print('Running in WSL')
         host = f'{platform.uname().node}.local'
     else:
-        print('Not running in WSL')
+        # print('Not running in WSL')
         host = platform.uname().node
     return host
 
@@ -51,18 +51,19 @@ async def connect():
         print('Connected to VTube Studio')
 
     # Get the authentication token
-    print('Getting authentication token...')
+    # print('Getting authentication token...')
     auth_token = await vtube_studio_functions.get_auth_token(websocket)
 
     # Authenticate the plugin with the authentication token
-    print('Authenticating plugin...')
+    # print('Authenticating plugin...')
     auth_response = await vtube_studio_functions.authenticate(websocket, auth_token)
 
     # If authentication failed, exit
     if not auth_response:
         raise Exception('Plugin authentication failed!')
     else:
-        print('Plugin authentication successful (VTube_Studio_API.py)')
+        # print('Plugin authentication successful (VTube_Studio_API.py)')
+        pass
 
 
 async def update_menus():
@@ -84,14 +85,14 @@ async def get_available_hotkeys(model_id=None):
     global params
     animation_list, expression_list = await vtube_studio_functions.get_hotkeys(websocket, model_id=model_id)
     params.update({'animation_list': animation_list})
-    print(f"Animations: {params['animation_list']}")
+    # print(f"Animations: {params['animation_list']}")
     if params['animation_list']:
         params.update({'animation': params['animation_list'][0]})  # explicitly update the params dictionary
     else:
         params.update({'animation': None})
 
     params.update({'expression_list': expression_list})
-    print(f"Expressions: {params['expression_list']}")
+    # print(f"Expressions: {params['expression_list']}")
     if params['expression_list']:
         params.update({'expression': params['expression_list'][0]})  # explicitly update the params dictionary
     else:
