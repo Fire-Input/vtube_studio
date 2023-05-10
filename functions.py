@@ -67,7 +67,7 @@ async def authenticate(websocket, auth_token):
 
 
 # Get the current model ID
-async def get_model_id(websocket):
+async def get_current_model(websocket):
     message = {
         "apiName": "VTubeStudioPublicAPI",
         "apiVersion": "1.0",
@@ -76,13 +76,17 @@ async def get_model_id(websocket):
     }
     await websocket.send(json.dumps(message))
     result = await websocket.recv()
-    return json.loads(result)["data"]["modelID"]
+    data = json.loads(result)
+    if data["data"]["modelLoaded"]:
+        return json.loads(result)["data"]["modelID"]
+    else:
+        return None
 
 
 # Get the hotkeys for the current model
 async def get_hotkeys(websocket, model_id=None):
     if not model_id:
-        model_id = await get_model_id(websocket)
+        model_id = await get_current_model(websocket)
     message = {
         "apiName": "VTubeStudioPublicAPI",
         "apiVersion": "1.0",
@@ -96,7 +100,7 @@ async def get_hotkeys(websocket, model_id=None):
         await websocket.send(json.dumps(message))
         result = await websocket.recv()
         data = json.loads(result)
-        print(json.dumps(data, indent=4))
+        # print(json.dumps(data, indent=4))
         expressions = []
         animations = []
         for item in data['data']["availableHotkeys"]:
@@ -107,10 +111,10 @@ async def get_hotkeys(websocket, model_id=None):
         return animations, expressions
     except websockets.ConnectionClosed as e:
         print("WebSocket connection closed: ", e)
-        return None
+        return None, None
     except Exception as e:
         print("Error while retrieving hotkeys: ", e)
-        return None
+        return None, None
 
 
 # Execute a hotkey
@@ -193,5 +197,38 @@ async def get_models(websocket):
     }
     await websocket.send(json.dumps(message))
     result = await websocket.recv()
-    model_names = json.loads(result)["data"]['availableModels']
-    return model_names
+    data = json.loads(result)
+    # print(json.dumps(data, indent=4))
+    models = {}
+    for item in data['data']["availableModels"]:
+        models[item['modelName']] = item['modelID']
+    return models
+
+
+async def load_model(websocket, model_name):
+    message = {
+        "apiName": "VTubeStudioPublicAPI",
+        "apiVersion": "1.0",
+        "requestID": "LoadModelID",
+        "messageType": "ModelLoadRequest",
+        "data": {
+            "modelID": model_name
+        }
+    }
+    await websocket.send(json.dumps(message))
+    result = await websocket.recv()
+    data = json.loads(result)
+    # If there was an error loading the model, print the error and return false
+    try:
+        if data["messageType"] == "APIError" or data["data"]["errorID"]:
+            print("Failed to load model!")
+            print(json.dumps(json.loads(result), indent=4))
+            return False
+        # If the model was successfully loaded, return true
+        else:
+            print("Model loaded successfully")
+            return True
+    # If there was no errorID, the model was successfully loaded
+    except KeyError:
+        print("Model loaded successfully")
+        return True
