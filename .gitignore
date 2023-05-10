@@ -3,3 +3,5 @@ __pycache__/
 *$py.class
 
 .idea/
+auth_token.txt
+test.py
